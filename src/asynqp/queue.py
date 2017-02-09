@@ -71,7 +71,8 @@ class Queue(object):
         if not exchange:
             raise InvalidExchangeName("Can't bind queue {} to the default exchange".format(self.name))
 
-        self.sender.send_QueueBind(self.name, exchange.name, routing_key, arguments or {})
+        if hasattr(exchange, 'name'): exchange = exchange.name
+        self.sender.send_QueueBind(self.name, exchange, routing_key, arguments or {})
         yield from self.synchroniser.await(spec.QueueBindOK)
         b = QueueBinding(self.reader, self.sender, self.synchroniser, self, exchange, routing_key)
         self.reader.ready()
@@ -215,7 +216,8 @@ class QueueBinding(object):
         if self.deleted:
             raise Deleted("Queue {} was already unbound from exchange {}".format(self.queue.name, self.exchange.name))
 
-        self.sender.send_QueueUnbind(self.queue.name, self.exchange.name, self.routing_key, arguments or {})
+        exchange = getattr(self.exchange, 'name', self.exchange)
+        self.sender.send_QueueUnbind(self.queue.name, exchange, self.routing_key, arguments or {})
         yield from self.synchroniser.await(spec.QueueUnbindOK)
         self.deleted = True
         self.reader.ready()
