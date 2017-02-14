@@ -23,7 +23,7 @@ def connect(host='localhost',
             port=5672,
             username='guest', password='guest',
             virtual_host='/',
-            on_connection_close=None, *,
+            on_connection_lost=None, *,
             loop=None, sock=None, **kwargs):
     """
     Connect to an AMQP server on the given host and port.
@@ -36,7 +36,7 @@ def connect(host='localhost',
     :param str username: the username to authenticate with.
     :param str password: the password to authenticate with.
     :param str virtual_host: the AMQP virtual host to connect to.
-    :param func on_connection_close: function called after connection lost.
+    :param func on_connection_lost: function called after connection lost.
     :keyword BaseEventLoop loop: An instance of :class:`~asyncio.BaseEventLoop` to use.
         (Defaults to :func:`asyncio.get_event_loop()`)
     :keyword socket sock: A :func:`~socket.socket` instance to use for the connection.
@@ -64,7 +64,7 @@ def connect(host='localhost',
     dispatcher = Dispatcher()
 
     def protocol_factory():
-        return AMQP(dispatcher, loop, close_callback=on_connection_close)
+        return AMQP(dispatcher, loop, connection_lost_callback=on_connection_lost)
     transport, protocol = yield from loop.create_connection(protocol_factory, **kwargs)
 
     # RPC-like applications require TCP_NODELAY in order to acheive
@@ -91,7 +91,7 @@ def connect_and_open_channel(host='localhost',
                              port=5672,
                              username='guest', password='guest',
                              virtual_host='/',
-                             on_connection_close=None, *,
+                             on_connection_lost=None, *,
                              loop=None, **kwargs):
     """
     Connect to an AMQP server and open a channel on the connection.
@@ -103,10 +103,10 @@ def connect_and_open_channel(host='localhost',
 
     Equivalent to::
 
-        connection = yield from connect(host, port, username, password, virtual_host, on_connection_close, loop=loop, **kwargs)
+        connection = yield from connect(host, port, username, password, virtual_host, on_connection_lost, loop=loop, **kwargs)
         channel = yield from connection.open_channel()
         return connection, channel
     """
-    connection = yield from connect(host, port, username, password, virtual_host, on_connection_close, loop=loop, **kwargs)
+    connection = yield from connect(host, port, username, password, virtual_host, on_connection_lost, loop=loop, **kwargs)
     channel = yield from connection.open_channel()
     return connection, channel

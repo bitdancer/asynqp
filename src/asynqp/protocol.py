@@ -8,13 +8,13 @@ from .log import log
 
 
 class AMQP(asyncio.Protocol):
-    def __init__(self, dispatcher, loop, close_callback=None):
+    def __init__(self, dispatcher, loop, connection_lost_callback=None):
         self.dispatcher = dispatcher
         self.partial_frame = b''
         self.frame_reader = FrameReader()
         self.heartbeat_monitor = HeartbeatMonitor(self, loop)
         self._closed = False
-        self._close_callback = close_callback
+        self._connection_lost_callback = connection_lost_callback
 
     def connection_made(self, transport):
         self.transport = transport
@@ -50,18 +50,19 @@ class AMQP(asyncio.Protocol):
         self.heartbeat_monitor.start(heartbeat_interval)
 
     def connection_lost(self, exc):
+
+        if self._connection_lost_callback:
+            self._connection_lost_callback(exc)
+
         # If self._closed=True - we closed the transport ourselves. No need to
         # dispatch PoisonPillFrame, as we should have closed everything already
-        if self._close_callback:
-            # _close_callback now only accepts coroutines
-            asyncio.async(self._close_callback(exc))
-
         if not self._closed:
             poison_exc = ConnectionLostError(
                 'The connection was unexpectedly lost', exc)
             self.dispatcher.dispatch_all(frames.PoisonPillFrame(poison_exc))
             # XXX: Really do we even need to raise this??? It's super bad API
-            raise poison_exc from exc
+            if not self._connection_lost_callback:
+                raise poison_exc from exc
 
     def heartbeat_timeout(self):
         """ Called by heartbeat_monitor on timeout """
